@@ -1,0 +1,108 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=10">
+<title>elastic-lint</title>
+<script type="text/javascript" src="https://rawgit.com/hbi99/defiant.js/master/dist/defiant.js"></script>
+<script type="text/javascript" src="https://code.jquery.com/jquery-2.2.0.js"></script>
+
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+
+<!-- Optional theme -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css" integrity="sha384-fLW2N01lMqjakBkx3l/M9EahuwpSfeNvV63J5ezn3uZzapT0u7EYsXMjQV+0En5r" crossorigin="anonymous">
+
+<!-- Latest compiled and minified JavaScript -->
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
+
+<script type="text/javascript">
+
+var es_url = 'http://fb9fc5cb2ec25653cbcde7cc0e3025e3.us-east-1.aws.found.io:9200';
+//var es_url = 'http://localhost:8080';
+
+var rules = []
+
+function registerRule(ruleFunc) {
+  rules.push(ruleFunc);
+}
+
+function LintResult (severity, explanation, solution) {
+  this.severity = severity; //RED, YELLOW, GREEN, IMP
+  this.explanation = explanation;
+  this.solution = solution;
+}
+
+</script>
+
+<script type="text/javascript" src="rules.js"></script>
+
+</head>
+<body>
+<script type="text/javascript">
+
+$(function () {
+  var nodesInfo = $.getJSON(es_url+'/_nodes');
+  var clusterSettings = $.getJSON(es_url+'/_cluster/settings');
+  var nodesStat = $.getJSON(es_url+'/_nodes/stats');
+  var clusterHealth = $.getJSON(es_url+'/_cluster/health');
+  $.when(nodesStat, clusterHealth, nodesInfo, clusterSettings).done(function(nodesStatResult, clusterHealthResult, nodesInfoResult, clusterSettingsResult){
+     $( "#clustername" ).html("Cluster: "+clusterHealthResult[0].cluster_name);
+
+//nodesInfoResult[0] = {"nodes":{"1":{"process":{"mlockall":false},"settings":{"node":{"data":false}}}}};
+
+     process (clusterHealthResult[0], clusterSettings[0], nodesStatResult[0], nodesInfoResult[0]);
+  });
+});
+
+function process (clusterHealth, clusterUpdateSettings, nodesStat, nodesInfo) {
+
+  for (var i=rules.length;i--;){
+    var lr = rules[i].execute(clusterHealth, clusterUpdateSettings, nodesStat, nodesInfo);
+
+    if(!lr || !lr.severity) {
+      continue;
+    }
+
+    if(lr.severity == "RED")
+    $('#'+rules[i].group).append('<span class="label label-default">'+rules[i].description+'</span><div class="alert alert-danger role="alert"><b>'+lr.explanation+'</b><p/>'+lr.solution+'</div>');
+    else if(lr.severity == "YELLOW")
+    $('#'+rules[i].group).append('<span class="label label-default">'+rules[i].description+'</span><div class="alert alert-warning role="alert"><b>'+lr.explanation+'</b><p/>'+lr.solution+'</div>');
+    else if(lr.severity == "GREEN")
+    $('#'+rules[i].group).append('<span class="label label-default">'+rules[i].description+'</span><div class="alert alert-success" role="alert"><b>'+lr.explanation+'</b><p/>'+lr.solution+'</div>');
+
+  }
+}
+
+</script>
+
+<nav class="navbar navbar-default">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1" aria-expanded="false">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="#" id="clustername"></a>
+    </div>
+  </div>
+  </nav>
+
+  <div class="row">
+    <div class="col-md-4">Basic</div>
+    <div class="col-md-4">Advanced</div>
+    <div class="col-md-4">Expert</div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-4" id="Basic"></div>
+    <div class="col-md-4" id="Advanced"></div>
+    <div class="col-md-4" id="Expert"></div>
+  </div>
+
+
+
+</body>
+</html>
